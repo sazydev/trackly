@@ -16,6 +16,10 @@ import {
   BadgeEuro,
   Repeat,
   LockKeyhole,
+  Filter,
+  CheckCircle,
+  AlertCircle,
+  X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -27,6 +31,77 @@ import AddTransactionModal from "../components/dashboard/AddTransactionModal";
 import TransactionsTable from "../components/dashboard/TransactionsTable";
 import PerformancePanel from "../components/dashboard/PerformancePanel";
 import { formatCurrency } from "../data/dashboardData";
+
+const dateFilterOptions = [
+  { value: "all", label: "Tout" },
+  { value: "today", label: "Aujourd’hui" },
+  { value: "7d", label: "7 jours" },
+  { value: "30d", label: "30 jours" },
+  { value: "month", label: "Ce mois-ci" },
+  { value: "year", label: "Cette année" },
+  { value: "custom", label: "Personnalisé" },
+];
+
+function startOfDay(date) {
+  const copy = new Date(date);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function endOfDay(date) {
+  const copy = new Date(date);
+  copy.setHours(23, 59, 59, 999);
+  return copy;
+}
+
+function getDateRange(filter, customStart, customEnd) {
+  const now = new Date();
+  let start = null;
+  let end = endOfDay(now);
+
+  if (filter === "today") {
+    start = startOfDay(now);
+  }
+
+  if (filter === "7d") {
+    start = startOfDay(now);
+    start.setDate(start.getDate() - 6);
+  }
+
+  if (filter === "30d") {
+    start = startOfDay(now);
+    start.setDate(start.getDate() - 29);
+  }
+
+  if (filter === "month") {
+    start = new Date(now.getFullYear(), now.getMonth(), 1);
+  }
+
+  if (filter === "year") {
+    start = new Date(now.getFullYear(), 0, 1);
+  }
+
+  if (filter === "custom") {
+    start = customStart ? startOfDay(new Date(customStart)) : null;
+    end = customEnd ? endOfDay(new Date(customEnd)) : endOfDay(now);
+  }
+
+  return { start, end };
+}
+
+function getFilterLabel(filter, customStart, customEnd) {
+  if (filter === "custom") {
+    if (customStart && customEnd) {
+      return `Du ${new Date(customStart).toLocaleDateString("fr-FR")} au ${new Date(
+        customEnd
+      ).toLocaleDateString("fr-FR")}`;
+    }
+
+    return "Période personnalisée";
+  }
+
+  return dateFilterOptions.find((option) => option.value === filter)?.label || "Période";
+}
 
 export default function DashboardPage({ user, onLogout }) {
   const [activePage, setActivePage] = useState("dashboard");
@@ -44,6 +119,11 @@ export default function DashboardPage({ user, onLogout }) {
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
 
+  const [dateFilter, setDateFilter] = useState("30d");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [toast, setToast] = useState(null);
+
   const [goalForm, setGoalForm] = useState({
     revenue_goal: "",
     profit_goal: "",
@@ -53,6 +133,12 @@ export default function DashboardPage({ user, onLogout }) {
       year: "numeric",
     }),
   });
+
+  function showToast(type, message) {
+    setToast({ type, message });
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => setToast(null), 3200);
+  }
 
   async function fetchTransactions() {
     setLoading(true);
@@ -64,7 +150,10 @@ export default function DashboardPage({ user, onLogout }) {
       .order("transaction_date", { ascending: true });
 
     if (!error) setTransactions(data || []);
-    else console.error(error);
+    else {
+      console.error(error);
+      showToast("error", "Impossible de charger les transactions.");
+    }
 
     setLoading(false);
   }
@@ -93,6 +182,7 @@ export default function DashboardPage({ user, onLogout }) {
       }
     } else {
       console.error(error);
+      showToast("error", "Impossible de charger les objectifs.");
     }
 
     setLoadingGoals(false);
@@ -108,7 +198,10 @@ export default function DashboardPage({ user, onLogout }) {
       .maybeSingle();
 
     if (!error) setSubscription(data);
-    else console.error(error);
+    else {
+      console.error(error);
+      showToast("error", "Impossible de charger l’abonnement.");
+    }
 
     setLoadingSubscription(false);
   }
@@ -145,7 +238,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   async function openCustomerPortal() {
     if (!subscription?.stripe_customer_id) {
-      alert("Aucun abonnement Stripe actif trouvé pour ce compte.");
+      showToast("error", "Aucun abonnement Stripe actif trouvé pour ce compte.");
       return;
     }
 
@@ -175,7 +268,7 @@ export default function DashboardPage({ user, onLogout }) {
 
       window.location.href = data.url;
     } catch (error) {
-      alert(error.message);
+      showToast("error", error.message);
     } finally {
       setPortalLoading(false);
     }
@@ -204,10 +297,11 @@ export default function DashboardPage({ user, onLogout }) {
       : await supabase.from("goals").insert(payload).select().single();
 
     if (response.error) {
-      alert(response.error.message);
+      showToast("error", response.error.message);
     } else {
       await fetchGoals();
       setIsEditingGoals(false);
+      showToast("success", "Objectifs enregistrés avec succès.");
     }
 
     setSavingGoals(false);
@@ -224,11 +318,12 @@ export default function DashboardPage({ user, onLogout }) {
       .eq("user_id", user.id);
 
     if (error) {
-      alert(error.message);
+      showToast("error", error.message);
       return;
     }
 
     await fetchTransactions();
+    showToast("success", "Transaction supprimée avec succès.");
   }
 
   function editTransaction(transaction) {
@@ -241,45 +336,75 @@ export default function DashboardPage({ user, onLogout }) {
     setModalOpen(false);
   }
 
+  const filteredTransactions = useMemo(() => {
+    const { start, end } = getDateRange(dateFilter, customStart, customEnd);
+
+    return transactions.filter((item) => {
+      if (!item.transaction_date) return false;
+
+      const transactionDate = new Date(item.transaction_date);
+      if (start && transactionDate < start) return false;
+      if (end && transactionDate > end) return false;
+
+      return true;
+    });
+  }, [transactions, dateFilter, customStart, customEnd]);
+
   const stats = useMemo(() => {
-    const revenue = transactions.reduce((acc, item) => acc + Number(item.revenue || 0), 0);
-    const expenses = transactions.reduce((acc, item) => acc + Number(item.expenses || 0), 0);
-    const profit = transactions.reduce((acc, item) => acc + Number(item.profit || 0), 0);
-    const sales = transactions.reduce((acc, item) => acc + Number(item.sales_count || 0), 0);
+    const revenue = filteredTransactions.reduce(
+      (acc, item) => acc + Number(item.revenue || 0),
+      0
+    );
+    const expenses = filteredTransactions.reduce(
+      (acc, item) => acc + Number(item.expenses || 0),
+      0
+    );
+    const profit = filteredTransactions.reduce(
+      (acc, item) => acc + Number(item.profit || 0),
+      0
+    );
+    const sales = filteredTransactions.reduce(
+      (acc, item) => acc + Number(item.sales_count || 0),
+      0
+    );
     const averageOrder = sales > 0 ? revenue / sales : 0;
 
     return { revenue, expenses, profit, sales, averageOrder };
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   const monthlyData = useMemo(() => {
     const months = {};
 
-    transactions.forEach((item) => {
+    filteredTransactions.forEach((item) => {
       const date = new Date(item.transaction_date);
-      const month = date.toLocaleDateString("fr-FR", { month: "short" });
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const month = date.toLocaleDateString("fr-FR", {
+        month: "short",
+        year: dateFilter === "year" || dateFilter === "all" ? "2-digit" : undefined,
+      });
 
-      if (!months[month]) {
-        months[month] = { month, revenue: 0, expenses: 0, profit: 0, sales: 0 };
+      if (!months[key]) {
+        months[key] = { month, revenue: 0, expenses: 0, profit: 0, sales: 0, key };
       }
 
-      months[month].revenue += Number(item.revenue || 0);
-      months[month].expenses += Number(item.expenses || 0);
-      months[month].profit += Number(item.profit || 0);
-      months[month].sales += Number(item.sales_count || 0);
+      months[key].revenue += Number(item.revenue || 0);
+      months[key].expenses += Number(item.expenses || 0);
+      months[key].profit += Number(item.profit || 0);
+      months[key].sales += Number(item.sales_count || 0);
     });
 
-    return Object.values(months);
-  }, [transactions]);
+    return Object.values(months).sort((a, b) => a.key.localeCompare(b.key));
+  }, [filteredTransactions, dateFilter]);
 
   const sourcesData = useMemo(() => {
-    const totalRevenue = transactions.reduce(
+    const totalRevenue = filteredTransactions.reduce(
       (acc, item) => acc + Number(item.revenue || 0),
       0
     );
 
     const sources = {};
 
-    transactions.forEach((item) => {
+    filteredTransactions.forEach((item) => {
       sources[item.business_type] =
         (sources[item.business_type] || 0) + Number(item.revenue || 0);
     });
@@ -288,15 +413,17 @@ export default function DashboardPage({ user, onLogout }) {
       name,
       value: totalRevenue > 0 ? Math.round((value / totalRevenue) * 100) : 0,
     }));
-  }, [transactions]);
+  }, [filteredTransactions]);
 
-  const revenueTransactions = transactions.filter(
+  const revenueTransactions = filteredTransactions.filter(
     (item) => Number(item.revenue || 0) > 0
   );
 
-  const expenseTransactions = transactions.filter(
+  const expenseTransactions = filteredTransactions.filter(
     (item) => Number(item.expenses || 0) > 0
   );
+
+  const periodLabel = getFilterLabel(dateFilter, customStart, customEnd);
 
   const pageTitles = {
     dashboard: {
@@ -329,6 +456,69 @@ export default function DashboardPage({ user, onLogout }) {
   function getProgress(current, goal) {
     if (!goal || Number(goal) <= 0) return 0;
     return Math.min(Math.round((Number(current) / Number(goal)) * 100), 100);
+  }
+
+  function renderDateFilters() {
+    if (!["dashboard", "revenues", "expenses"].includes(activePage)) return null;
+
+    return (
+      <div className="date-filter-card">
+        <div className="date-filter-title">
+          <Filter size={17} />
+          <span>{periodLabel}</span>
+        </div>
+
+        <div className="date-filter-actions">
+          {dateFilterOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={dateFilter === option.value ? "active" : ""}
+              onClick={() => setDateFilter(option.value)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        {dateFilter === "custom" && (
+          <div className="custom-date-row">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+            />
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSkeleton() {
+    return (
+      <div className="skeleton-page">
+        <section className="stats-grid">
+          {[1, 2, 3, 4].map((item) => (
+            <div className="stat-card skeleton-card" key={item}>
+              <div className="skeleton skeleton-icon"></div>
+              <div className="skeleton skeleton-line small"></div>
+              <div className="skeleton skeleton-line large"></div>
+              <div className="skeleton skeleton-line medium"></div>
+            </div>
+          ))}
+        </section>
+
+        <section className="dashboard-grid main-grid">
+          <div className="panel skeleton-panel"></div>
+          <div className="panel skeleton-panel"></div>
+        </section>
+      </div>
+    );
   }
 
   function renderGoalsPage() {
@@ -709,11 +899,7 @@ export default function DashboardPage({ user, onLogout }) {
 
   function renderContent() {
     if (loading) {
-      return (
-        <div className="panel empty-panel">
-          <h3>Chargement des données...</h3>
-        </div>
-      );
+      return renderSkeleton();
     }
 
     if (activePage === "goals") {
@@ -739,12 +925,29 @@ export default function DashboardPage({ user, onLogout }) {
       );
     }
 
+    if (filteredTransactions.length === 0) {
+      return (
+        <>
+          {renderDateFilters()}
+          <div className="panel empty-panel">
+            <h3>Aucune donnée sur cette période</h3>
+            <p>Change la période ou ajoute une nouvelle transaction.</p>
+            <button className="add-btn" onClick={() => setModalOpen(true)}>
+              <Plus size={18} />
+              Ajouter une vente
+            </button>
+          </div>
+        </>
+      );
+    }
+
     if (activePage === "revenues") {
       return (
         <>
-          <StatsCards stats={stats} />
+          {renderDateFilters()}
+          <StatsCards stats={stats} periodLabel={periodLabel} />
           <section className="dashboard-grid main-grid">
-            <RevenueChart data={monthlyData} />
+            <RevenueChart data={monthlyData} periodLabel={periodLabel} />
             <RevenueSources data={sourcesData} />
           </section>
           <TransactionsTable
@@ -761,14 +964,15 @@ export default function DashboardPage({ user, onLogout }) {
     if (activePage === "expenses") {
       return (
         <>
+          {renderDateFilters()}
           <section className="insight-grid">
-            <div className="panel insight-card">
+            <div className="panel insight-card premium-appear">
               <Wallet size={22} />
               <span>Dépenses totales</span>
               <strong>{formatCurrency(stats.expenses)}</strong>
             </div>
 
-            <div className="panel insight-card">
+            <div className="panel insight-card premium-appear">
               <TrendingDown size={22} />
               <span>Bénéfice après dépenses</span>
               <strong>{formatCurrency(stats.profit - stats.expenses)}</strong>
@@ -788,16 +992,17 @@ export default function DashboardPage({ user, onLogout }) {
 
     return (
       <>
-        <StatsCards stats={stats} />
+        {renderDateFilters()}
+        <StatsCards stats={stats} periodLabel={periodLabel} />
 
         <section className="dashboard-grid main-grid">
-          <RevenueChart data={monthlyData} />
+          <RevenueChart data={monthlyData} periodLabel={periodLabel} />
           <RevenueSources data={sourcesData} />
         </section>
 
         <section className="dashboard-grid bottom-grid">
           <TransactionsTable
-            transactions={transactions}
+            transactions={filteredTransactions}
             onEdit={editTransaction}
             onDelete={deleteTransaction}
           />
@@ -828,12 +1033,23 @@ export default function DashboardPage({ user, onLogout }) {
         {renderContent()}
       </section>
 
+      {toast && (
+        <div className={`toast ${toast.type}`}>
+          {toast.type === "success" ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.message}</span>
+          <button type="button" onClick={() => setToast(null)}>
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {modalOpen && (
         <AddTransactionModal
           user={user}
           transactionToEdit={selectedTransaction}
           onClose={closeModal}
           onSaved={fetchTransactions}
+          onToast={showToast}
         />
       )}
     </main>

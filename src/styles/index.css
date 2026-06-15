@@ -2481,3 +2481,221 @@ textarea:focus {
 .settings-list strong {
   text-align: right;
 }
+/* UX PREMIUM - FILTERS, TOASTS, SKELETONS */
+
+.premium-appear,
+.panel,
+.stat-card {
+  animation: premiumAppear 0.35s ease both;
+}
+
+@keyframes premiumAppear {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.date-filter-card {
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid #1f1f1f;
+  border-radius: 22px;
+  background: rgba(15, 15, 17, 0.88);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(14px);
+  animation: premiumAppear 0.35s ease both;
+}
+
+.date-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  color: #bfdbfe;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.date-filter-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.date-filter-actions button {
+  width: auto;
+  height: 38px;
+  padding: 0 13px;
+  border: 1px solid #262626;
+  border-radius: 999px;
+  background: #0c0c0e;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.date-filter-actions button:hover,
+.date-filter-actions button.active {
+  transform: translateY(-1px);
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(59, 130, 246, 0.13);
+  color: white;
+}
+
+.custom-date-row {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.toast {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 9500;
+  min-width: min(420px, calc(100vw - 40px));
+  padding: 14px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 18px;
+  border: 1px solid #262626;
+  background: rgba(12, 12, 15, 0.96);
+  color: white;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(18px);
+  animation: toastIn 0.25s ease both;
+}
+
+.toast.success {
+  border-color: rgba(34, 197, 94, 0.28);
+}
+
+.toast.success svg {
+  color: #4ade80;
+}
+
+.toast.error {
+  border-color: rgba(244, 63, 94, 0.28);
+}
+
+.toast.error svg {
+  color: #fb7185;
+}
+
+.toast span {
+  flex: 1;
+  color: #d4d4d8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.toast button {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid #262626;
+  background: #111113;
+  color: white;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.skeleton-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.skeleton-card,
+.skeleton-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton-panel {
+  min-height: 420px;
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #16161a;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: skeletonMove 1.2s infinite;
+}
+
+.skeleton-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  margin-bottom: 18px;
+}
+
+.skeleton-line {
+  height: 14px;
+  margin-bottom: 12px;
+}
+
+.skeleton-line.small {
+  width: 42%;
+}
+
+.skeleton-line.medium {
+  width: 62%;
+}
+
+.skeleton-line.large {
+  width: 78%;
+  height: 28px;
+}
+
+@keyframes skeletonMove {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.stat-card:hover,
+.panel:hover {
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+@media (max-width: 720px) {
+  .custom-date-row {
+    grid-template-columns: 1fr;
+  }
+
+  .toast {
+    right: 20px;
+    bottom: 20px;
+  }
+}

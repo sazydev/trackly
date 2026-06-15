@@ -9,16 +9,16 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-export default function RevenueChart({ data }) {
+export default function RevenueChart({ data, periodLabel = "Période" }) {
   return (
-    <div className="panel revenue-panel">
+    <div className="panel revenue-panel premium-appear">
       <div className="panel-header">
         <div>
           <h3>Évolution du chiffre d’affaires</h3>
-          <p>Revenus, dépenses et bénéfices sur les 6 derniers mois.</p>
+          <p>Revenus, dépenses et bénéfices selon la période sélectionnée.</p>
         </div>
 
-        <span>6 mois</span>
+        <span>{periodLabel}</span>
       </div>
 
       <div className="chart-wrapper">

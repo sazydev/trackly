@@ -24,6 +24,7 @@ export default function AddTransactionModal({
   user,
   onClose,
   onSaved,
+  onToast,
   transactionToEdit = null,
 }) {
   const isEditing = Boolean(transactionToEdit);
@@ -97,11 +98,15 @@ export default function AddTransactionModal({
     setLoading(false);
 
     if (error) {
-      alert(error.message);
+      onToast?.("error", error.message);
       return;
     }
 
     await onSaved();
+    onToast?.(
+      "success",
+      isEditing ? "Transaction modifiée avec succès." : "Transaction ajoutée avec succès."
+    );
     onClose();
   }
 
@@ -116,7 +121,7 @@ export default function AddTransactionModal({
             <h2>{isEditing ? "Modifier la transaction" : "Ajouter une vente"}</h2>
           </div>
 
-          <button className="modal-close" onClick={onClose}>
+          <button className="modal-close" onClick={onClose} type="button">
             <X size={18} />
           </button>
         </div>
