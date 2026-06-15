@@ -26,7 +26,6 @@ exports.handler = async (event) => {
     );
   } catch (error) {
     console.error("Webhook signature error:", error.message);
-
     return {
       statusCode: 400,
       body: `Webhook error: ${error.message}`,
@@ -41,43 +40,24 @@ exports.handler = async (event) => {
       const subscriptionId = session.subscription;
       const customerId = session.customer;
 
-      if (userId) {
+      if (userId && subscriptionId) {
+        const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+
         await supabaseAdmin.from("subscriptions").upsert(
           {
             user_id: userId,
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
-            status: "active",
+            status: stripeSubscription.status,
             plan: "pro",
+            current_period_end: stripeSubscription.current_period_end
+              ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+              : null,
           },
           {
             onConflict: "user_id",
           }
         );
-      }
-    }
-
-    if (stripeEvent.type === "customer.subscription.deleted") {
-      const subscription = stripeEvent.data.object;
-
-      await supabaseAdmin
-        .from("subscriptions")
-        .update({
-          status: "canceled",
-        })
-        .eq("stripe_subscription_id", subscription.id);
-    }
-
-    if (stripeEvent.type === "invoice.payment_failed") {
-      const invoice = stripeEvent.data.object;
-
-      if (invoice.subscription) {
-        await supabaseAdmin
-          .from("subscriptions")
-          .update({
-            status: "past_due",
-          })
-          .eq("stripe_subscription_id", invoice.subscription);
       }
     }
 
@@ -93,6 +73,31 @@ exports.handler = async (event) => {
             : null,
         })
         .eq("stripe_subscription_id", subscription.id);
+    }
+
+    if (stripeEvent.type === "customer.subscription.deleted") {
+      const subscription = stripeEvent.data.object;
+
+      await supabaseAdmin
+        .from("subscriptions")
+        .update({
+          status: "canceled",
+          current_period_end: null,
+        })
+        .eq("stripe_subscription_id", subscription.id);
+    }
+
+    if (stripeEvent.type === "invoice.payment_failed") {
+      const invoice = stripeEvent.data.object;
+
+      if (invoice.subscription) {
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({
+            status: "past_due",
+          })
+          .eq("stripe_subscription_id", invoice.subscription);
+      }
     }
 
     return {
