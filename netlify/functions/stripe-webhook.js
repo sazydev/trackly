@@ -6,6 +6,15 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+function getCurrentPeriodEnd(subscription) {
+  const timestamp =
+    subscription.current_period_end ||
+    subscription.items?.data?.[0]?.current_period_end ||
+    null;
+
+  return timestamp ? new Date(timestamp * 1000).toISOString() : null;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return {
@@ -43,61 +52,50 @@ exports.handler = async (event) => {
       if (userId && subscriptionId) {
         const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-        await supabaseAdmin.from("subscriptions").upsert(
+        const { error } = await supabaseAdmin.from("subscriptions").upsert(
           {
             user_id: userId,
             stripe_customer_id: customerId,
             stripe_subscription_id: subscriptionId,
             status: stripeSubscription.status,
             plan: "pro",
-            current_period_end: stripeSubscription.current_period_end
-              ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
-              : null,
+            current_period_end: getCurrentPeriodEnd(stripeSubscription),
           },
           {
             onConflict: "user_id",
           }
         );
+
+        if (error) throw error;
       }
     }
 
     if (stripeEvent.type === "customer.subscription.updated") {
       const subscription = stripeEvent.data.object;
 
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from("subscriptions")
         .update({
           status: subscription.status,
-          current_period_end: subscription.current_period_end
-            ? new Date(subscription.current_period_end * 1000).toISOString()
-            : null,
+          current_period_end: getCurrentPeriodEnd(subscription),
         })
         .eq("stripe_subscription_id", subscription.id);
+
+      if (error) throw error;
     }
 
     if (stripeEvent.type === "customer.subscription.deleted") {
       const subscription = stripeEvent.data.object;
 
-      await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from("subscriptions")
         .update({
           status: "canceled",
           current_period_end: null,
         })
         .eq("stripe_subscription_id", subscription.id);
-    }
 
-    if (stripeEvent.type === "invoice.payment_failed") {
-      const invoice = stripeEvent.data.object;
-
-      if (invoice.subscription) {
-        await supabaseAdmin
-          .from("subscriptions")
-          .update({
-            status: "past_due",
-          })
-          .eq("stripe_subscription_id", invoice.subscription);
-      }
+      if (error) throw error;
     }
 
     return {
