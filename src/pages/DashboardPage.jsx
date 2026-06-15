@@ -20,6 +20,9 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -123,6 +126,8 @@ export default function DashboardPage({ user, onLogout }) {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [toast, setToast] = useState(null);
+  const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [deletingTransaction, setDeletingTransaction] = useState(false);
 
   const [goalForm, setGoalForm] = useState({
     revenue_goal: "",
@@ -307,21 +312,29 @@ export default function DashboardPage({ user, onLogout }) {
     setSavingGoals(false);
   }
 
-  async function deleteTransaction(transaction) {
-    const confirmDelete = window.confirm(`Supprimer "${transaction.title}" ?`);
-    if (!confirmDelete) return;
+  function askDeleteTransaction(transaction) {
+    setTransactionToDelete(transaction);
+  }
+
+  async function deleteTransaction() {
+    if (!transactionToDelete) return;
+
+    setDeletingTransaction(true);
 
     const { error } = await supabase
       .from("transactions")
       .delete()
-      .eq("id", transaction.id)
+      .eq("id", transactionToDelete.id)
       .eq("user_id", user.id);
+
+    setDeletingTransaction(false);
 
     if (error) {
       showToast("error", error.message);
       return;
     }
 
+    setTransactionToDelete(null);
     await fetchTransactions();
     showToast("success", "Transaction supprimée avec succès.");
   }
@@ -955,7 +968,7 @@ export default function DashboardPage({ user, onLogout }) {
             transactions={revenueTransactions}
             title="Transactions de revenus"
             onEdit={editTransaction}
-            onDelete={deleteTransaction}
+            onDelete={askDeleteTransaction}
           />
         </>
       );
@@ -984,7 +997,7 @@ export default function DashboardPage({ user, onLogout }) {
             transactions={expenseTransactions}
             title="Dépenses enregistrées"
             onEdit={editTransaction}
-            onDelete={deleteTransaction}
+            onDelete={askDeleteTransaction}
           />
         </>
       );
@@ -1004,7 +1017,7 @@ export default function DashboardPage({ user, onLogout }) {
           <TransactionsTable
             transactions={filteredTransactions}
             onEdit={editTransaction}
-            onDelete={deleteTransaction}
+            onDelete={askDeleteTransaction}
           />
 
           <PerformancePanel stats={stats} />
@@ -1040,6 +1053,60 @@ export default function DashboardPage({ user, onLogout }) {
           <button type="button" onClick={() => setToast(null)}>
             <X size={15} />
           </button>
+        </div>
+      )}
+
+      {transactionToDelete && (
+        <div className="modal-overlay confirm-overlay">
+          <section className="confirm-modal">
+            <div className="confirm-icon danger">
+              <AlertTriangle size={24} />
+            </div>
+
+            <div>
+              <span className="eyebrow">Suppression</span>
+              <h2>Supprimer cette transaction ?</h2>
+              <p>
+                Tu es sur le point de supprimer
+                <strong> {transactionToDelete.title}</strong>. Cette action est définitive.
+              </p>
+            </div>
+
+            <div className="confirm-preview">
+              <span>Montant</span>
+              <strong>{formatCurrency(Number(transactionToDelete.revenue || 0))}</strong>
+            </div>
+
+            <div className="confirm-actions">
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setTransactionToDelete(null)}
+                disabled={deletingTransaction}
+              >
+                Annuler
+              </button>
+
+              <button
+                type="button"
+                className="danger-btn"
+                onClick={deleteTransaction}
+                disabled={deletingTransaction}
+              >
+                {deletingTransaction ? (
+                  <>
+                    <Loader2 size={18} className="spinner" />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={18} />
+                    Supprimer
+                  </>
+                )}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

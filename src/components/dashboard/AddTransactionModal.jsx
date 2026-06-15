@@ -43,6 +43,8 @@ export default function AddTransactionModal({
 
   const [loading, setLoading] = useState(false);
 
+  const calculatedProfit = Number(form.revenue || 0) - Number(form.expenses || 0);
+
   useEffect(() => {
     if (transactionToEdit) {
       setForm({
@@ -78,7 +80,7 @@ export default function AddTransactionModal({
       business_type: form.business_type,
       transaction_type: form.transaction_type,
       revenue: Number(form.revenue || 0),
-      profit: Number(form.profit || 0),
+      profit: calculatedProfit,
       expenses: Number(form.expenses || 0),
       sales_count: Number(form.sales_count || 1),
       transaction_date: form.transaction_date,
@@ -177,13 +179,16 @@ export default function AddTransactionModal({
           </div>
 
           <div className="form-group">
-            <label>Bénéfice net</label>
+            <label>Bénéfice net automatique</label>
             <input
               type="number"
-              placeholder="0"
-              value={form.profit}
-              onChange={(e) => updateField("profit", e.target.value)}
+              value={calculatedProfit}
+              readOnly
+              className="readonly-input"
             />
+            <small className="auto-profit-hint">
+              Calculé automatiquement : chiffre d’affaires - dépenses
+            </small>
           </div>
 
           <div className="form-group">
