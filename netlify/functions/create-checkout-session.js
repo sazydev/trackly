@@ -24,6 +24,8 @@ exports.handler = async (event) => {
       };
     }
 
+    const siteUrl = process.env.URL || "http://localhost:5173";
+
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
@@ -34,8 +36,8 @@ exports.handler = async (event) => {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.URL}/subscribe?success=true`,
-      cancel_url: `${process.env.URL}/subscribe?canceled=true`,
+      success_url: `${siteUrl}/payment-success`,
+      cancel_url: `${siteUrl}/subscribe?canceled=true`,
       metadata: {
         user_id: userId,
       },

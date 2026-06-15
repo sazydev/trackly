@@ -13,6 +13,9 @@ import {
   Mail,
   CreditCard,
   ExternalLink,
+  BadgeEuro,
+  Repeat,
+  LockKeyhole,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -568,6 +571,38 @@ export default function DashboardPage({ user, onLogout }) {
                       Email de facturation
                     </span>
                     <strong>{user.email}</strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <BadgeEuro size={16} />
+                      Tarif
+                    </span>
+                    <strong>9,99 € / mois</strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <Calendar size={16} />
+                      Abonné depuis
+                    </span>
+                    <strong>{formatDate(subscription?.created_at)}</strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <Repeat size={16} />
+                      Renouvellement
+                    </span>
+                    <strong className="positive-text">Automatique</strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <LockKeyhole size={16} />
+                      Paiement
+                    </span>
+                    <strong className="positive-text">Sécurisé via Stripe</strong>
                   </div>
                 </div>
 

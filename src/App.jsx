@@ -6,6 +6,7 @@ import AuthPage from "./pages/AuthPage";
 import DashboardPage from "./pages/DashboardPage";
 import LandingPage from "./pages/LandingPage";
 import SubscribePage from "./pages/SubscribePage";
+import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PixelSnow from "./components/ui/PixelSnow";
 import CustomCursor from "./components/ui/CustomCursor";
 
@@ -106,6 +107,17 @@ export default function App() {
               ) : (
                 <SubscribePage user={session.user} onLogout={handleLogout} />
               )
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+
+        <Route
+          path="/payment-success"
+          element={
+            session ? (
+              <PaymentSuccessPage user={session.user} />
             ) : (
               <Navigate to="/login" />
             )
