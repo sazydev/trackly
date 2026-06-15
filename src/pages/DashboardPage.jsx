@@ -7,6 +7,12 @@ import {
   Wallet,
   Save,
   Pencil,
+  Crown,
+  ShieldCheck,
+  Calendar,
+  Mail,
+  CreditCard,
+  ExternalLink,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -23,14 +29,17 @@ export default function DashboardPage({ user, onLogout }) {
   const [activePage, setActivePage] = useState("dashboard");
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState(null);
+  const [subscription, setSubscription] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [loadingGoals, setLoadingGoals] = useState(true);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const [savingGoals, setSavingGoals] = useState(false);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [goalForm, setGoalForm] = useState({
     revenue_goal: "",
@@ -86,10 +95,88 @@ export default function DashboardPage({ user, onLogout }) {
     setLoadingGoals(false);
   }
 
+  async function fetchSubscription() {
+    setLoadingSubscription(true);
+
+    const { data, error } = await supabase
+      .from("subscriptions")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (!error) setSubscription(data);
+    else console.error(error);
+
+    setLoadingSubscription(false);
+  }
+
   useEffect(() => {
     fetchTransactions();
     fetchGoals();
+    fetchSubscription();
   }, []);
+
+  function formatDate(date) {
+    if (!date) return "Synchronisation en cours";
+
+    return new Date(date).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function getSubscriptionLabel(status) {
+    if (status === "active") return "Actif";
+    if (status === "pending") return "En attente";
+    if (status === "past_due") return "Paiement en retard";
+    if (status === "canceled") return "Annulé";
+    return "Inactif";
+  }
+
+  function getSubscriptionClass(status) {
+    if (status === "active") return "positive-text";
+    if (status === "pending") return "warning-text";
+    return "negative-text";
+  }
+
+  async function openCustomerPortal() {
+    if (!subscription?.stripe_customer_id) {
+      alert("Aucun abonnement Stripe actif trouvé pour ce compte.");
+      return;
+    }
+
+    try {
+      setPortalLoading(true);
+
+      const response = await fetch("/.netlify/functions/create-customer-portal", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          customerId: subscription.stripe_customer_id,
+        }),
+      });
+
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
+
+      if (!response.ok) {
+        throw new Error(data.error || "Impossible d’ouvrir le portail Stripe.");
+      }
+
+      if (!data.url) {
+        throw new Error("URL Stripe Portal manquante.");
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      setPortalLoading(false);
+    }
+  }
 
   async function handleSaveGoals(e) {
     e.preventDefault();
@@ -232,7 +319,7 @@ export default function DashboardPage({ user, onLogout }) {
     settings: {
       eyebrow: "Workspace settings",
       title: "Paramètres Trackly",
-      text: "Gère tes données, ajoute une vente et prépare ton espace business.",
+      text: "Gère tes données, ton abonnement et ton espace business.",
     },
   };
 
@@ -406,6 +493,185 @@ export default function DashboardPage({ user, onLogout }) {
     );
   }
 
+  function renderSettingsPage() {
+    return (
+      <section className="settings-page">
+        <section className="settings-hero panel">
+          <div className="settings-avatar">
+            {(user.user_metadata?.full_name || user.email || "U")
+              .charAt(0)
+              .toUpperCase()}
+          </div>
+
+          <div>
+            <span className="eyebrow">Compte Trackly</span>
+            <h3>{user.user_metadata?.full_name || "Utilisateur Trackly"}</h3>
+            <p>{user.email}</p>
+          </div>
+
+          <div className="account-status">
+            <ShieldCheck size={18} />
+            Compte sécurisé
+          </div>
+        </section>
+
+        <section className="settings-grid">
+          <div className="panel settings-panel subscription-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Mon abonnement</h3>
+                <p>Gère ton accès Trackly Pro et ton paiement.</p>
+              </div>
+
+              <div className="subscription-icon">
+                <Crown size={22} />
+              </div>
+            </div>
+
+            {loadingSubscription ? (
+              <div className="mini-empty">Chargement de l’abonnement...</div>
+            ) : (
+              <>
+                <div className="subscription-plan-card">
+                  <div>
+                    <span>Plan actuel</span>
+                    <strong>Trackly Pro</strong>
+                  </div>
+
+                  <p className={getSubscriptionClass(subscription?.status)}>
+                    {getSubscriptionLabel(subscription?.status)}
+                  </p>
+                </div>
+
+                <div className="settings-list">
+                  <div>
+                    <span>
+                      <CreditCard size={16} />
+                      Statut
+                    </span>
+                    <strong className={getSubscriptionClass(subscription?.status)}>
+                      {getSubscriptionLabel(subscription?.status)}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <Calendar size={16} />
+                      Prochain paiement
+                    </span>
+                    <strong>{formatDate(subscription?.current_period_end)}</strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      <Mail size={16} />
+                      Email de facturation
+                    </span>
+                    <strong>{user.email}</strong>
+                  </div>
+                </div>
+
+                <button
+                  className="add-btn settings-add-btn billing-btn"
+                  onClick={openCustomerPortal}
+                  disabled={portalLoading || !subscription?.stripe_customer_id}
+                >
+                  <ExternalLink size={18} />
+                  {portalLoading ? "Ouverture..." : "Gérer mon abonnement"}
+                </button>
+              </>
+            )}
+          </div>
+
+          <div className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Informations du compte</h3>
+                <p>Résumé de ton espace utilisateur Trackly.</p>
+              </div>
+            </div>
+
+            <div className="settings-list">
+              <div>
+                <span>
+                  <Mail size={16} />
+                  Email
+                </span>
+                <strong>{user.email}</strong>
+              </div>
+
+              <div>
+                <span>
+                  <Calendar size={16} />
+                  Compte créé le
+                </span>
+                <strong>{formatDate(user.created_at)}</strong>
+              </div>
+
+              <div>
+                <span>
+                  <ShieldCheck size={16} />
+                  Sécurité
+                </span>
+                <strong className="positive-text">Compte protégé</strong>
+              </div>
+
+              <div>
+                <span>
+                  <CreditCard size={16} />
+                  Accès dashboard
+                </span>
+                <strong className="positive-text">Autorisé</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="settings-grid">
+          <div className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Ajouter une vente</h3>
+                <p>Ajoute une transaction pour alimenter automatiquement ton dashboard.</p>
+              </div>
+            </div>
+
+            <button className="add-btn settings-add-btn" onClick={() => setModalOpen(true)}>
+              <Plus size={18} />
+              Ajouter une vente
+            </button>
+          </div>
+
+          <div className="panel settings-panel">
+            <div className="panel-header">
+              <div>
+                <h3>État de la base</h3>
+                <p>Données synchronisées avec Supabase.</p>
+              </div>
+            </div>
+
+            <div className="settings-list">
+              <div>
+                <span>Transactions</span>
+                <strong>{transactions.length}</strong>
+              </div>
+
+              <div>
+                <span>Objectifs</span>
+                <strong>{goals ? "Définis" : "Non définis"}</strong>
+              </div>
+
+              <div>
+                <span>Statut</span>
+                <strong className="positive-text">Synchronisé</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    );
+  }
+
   function renderContent() {
     if (loading) {
       return (
@@ -419,7 +685,11 @@ export default function DashboardPage({ user, onLogout }) {
       return renderGoalsPage();
     }
 
-    if (transactions.length === 0 && activePage !== "settings") {
+    if (activePage === "settings") {
+      return renderSettingsPage();
+    }
+
+    if (transactions.length === 0) {
       return (
         <div className="panel empty-panel">
           <h3>Aucune donnée pour le moment</h3>
@@ -478,57 +748,6 @@ export default function DashboardPage({ user, onLogout }) {
             onDelete={deleteTransaction}
           />
         </>
-      );
-    }
-
-    if (activePage === "settings") {
-      return (
-        <section className="settings-grid">
-          <div className="panel settings-panel">
-            <div className="panel-header">
-              <div>
-                <h3>Ajouter une vente</h3>
-                <p>Ajoute manuellement une transaction pour alimenter ton dashboard.</p>
-              </div>
-            </div>
-
-            <button className="add-btn settings-add-btn" onClick={() => setModalOpen(true)}>
-              <Plus size={18} />
-              Ajouter une vente
-            </button>
-          </div>
-
-          <div className="panel settings-panel">
-            <div className="panel-header">
-              <div>
-                <h3>État de la base</h3>
-                <p>Données synchronisées avec Supabase.</p>
-              </div>
-            </div>
-
-            <div className="settings-list">
-              <div>
-                <span>Utilisateur</span>
-                <strong>{user.email}</strong>
-              </div>
-
-              <div>
-                <span>Transactions</span>
-                <strong>{transactions.length}</strong>
-              </div>
-
-              <div>
-                <span>Objectifs</span>
-                <strong>{goals ? "Définis" : "Non définis"}</strong>
-              </div>
-
-              <div>
-                <span>Statut</span>
-                <strong className="positive-text">Connecté</strong>
-              </div>
-            </div>
-          </div>
-        </section>
       );
     }
 

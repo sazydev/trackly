@@ -2315,3 +2315,169 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+/* SETTINGS PREMIUM */
+
+.settings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.settings-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  color: white;
+  font-size: 28px;
+  font-weight: 900;
+  box-shadow: 0 18px 50px rgba(59, 130, 246, 0.24);
+}
+
+.settings-hero h3 {
+  font-size: 26px;
+  margin-bottom: 4px;
+  letter-spacing: -0.04em;
+}
+
+.settings-hero p {
+  color: #9ca3af;
+}
+
+.account-status {
+  margin-left: auto;
+  height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #86efac;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.subscription-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.subscription-panel::after {
+  content: "";
+  position: absolute;
+  right: -50px;
+  top: -50px;
+  width: 180px;
+  height: 180px;
+  border-radius: 999px;
+  background: rgba(96, 165, 250, 0.08);
+  filter: blur(34px);
+  pointer-events: none;
+}
+
+.subscription-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+}
+
+.subscription-plan-card {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 14px;
+  padding: 18px;
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(59, 130, 246, 0.11), rgba(139, 92, 246, 0.08)),
+    #0c0c0e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.subscription-plan-card span {
+  display: block;
+  color: #9ca3af;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.subscription-plan-card strong {
+  font-size: 28px;
+  letter-spacing: -0.05em;
+}
+
+.subscription-plan-card p {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.09);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.billing-btn {
+  width: 230px;
+}
+
+.warning-text {
+  color: #fbbf24;
+}
+
+@media (max-width: 900px) {
+  .settings-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .account-status {
+    margin-left: 0;
+  }
+
+  .subscription-plan-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .billing-btn {
+    width: 100%;
+  }
+}
+.settings-list div span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.settings-list div span svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.settings-list div {
+  min-height: 54px;
+}
+
+.settings-list strong {
+  text-align: right;
+}
