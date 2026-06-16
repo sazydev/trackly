@@ -1056,59 +1056,76 @@ export default function DashboardPage({ user, onLogout }) {
         </div>
       )}
 
-      {transactionToDelete && (
-        <div className="modal-overlay confirm-overlay">
-          <section className="confirm-modal">
-            <div className="confirm-icon danger">
-              <AlertTriangle size={24} />
-            </div>
+{transactionToDelete && (
+  <div
+    className="delete-modal-overlay"
+    onClick={() => !deletingTransaction && setTransactionToDelete(null)}
+  >
+    <section
+      className="delete-modal-card"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        className="delete-modal-close"
+        onClick={() => setTransactionToDelete(null)}
+        disabled={deletingTransaction}
+        aria-label="Fermer"
+      >
+        <X size={18} />
+      </button>
 
-            <div>
-              <span className="eyebrow">Suppression</span>
-              <h2>Supprimer cette transaction ?</h2>
-              <p>
-                Tu es sur le point de supprimer
-                <strong> {transactionToDelete.title}</strong>. Cette action est définitive.
-              </p>
-            </div>
+      <div className="delete-modal-icon">
+        <AlertTriangle size={30} />
+      </div>
 
-            <div className="confirm-preview">
-              <span>Montant</span>
-              <strong>{formatCurrency(Number(transactionToDelete.revenue || 0))}</strong>
-            </div>
+      <span className="delete-modal-kicker">Suppression définitive</span>
 
-            <div className="confirm-actions">
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setTransactionToDelete(null)}
-                disabled={deletingTransaction}
-              >
-                Annuler
-              </button>
+      <h2>Supprimer cette transaction ?</h2>
 
-              <button
-                type="button"
-                className="danger-btn"
-                onClick={deleteTransaction}
-                disabled={deletingTransaction}
-              >
-                {deletingTransaction ? (
-                  <>
-                    <Loader2 size={18} className="spinner" />
-                    Suppression...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={18} />
-                    Supprimer
-                  </>
-                )}
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+      <p>
+        Tu es sur le point de supprimer{" "}
+        <strong>{transactionToDelete.title}</strong>. Cette action est
+        définitive.
+      </p>
+
+      <div className="delete-modal-summary">
+        <span>Montant</span>
+        <strong>{formatCurrency(Number(transactionToDelete.revenue || 0))}</strong>
+      </div>
+
+      <div className="delete-modal-actions">
+        <button
+          type="button"
+          className="delete-cancel-btn"
+          onClick={() => setTransactionToDelete(null)}
+          disabled={deletingTransaction}
+        >
+          Annuler
+        </button>
+
+        <button
+          type="button"
+          className="delete-confirm-btn"
+          onClick={deleteTransaction}
+          disabled={deletingTransaction}
+        >
+          {deletingTransaction ? (
+            <>
+              <Loader2 size={18} className="spinner" />
+              Suppression...
+            </>
+          ) : (
+            <>
+              <Trash2 size={18} />
+              Supprimer
+            </>
+          )}
+        </button>
+      </div>
+    </section>
+  </div>
+)}
 
       {modalOpen && (
         <AddTransactionModal

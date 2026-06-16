@@ -187,7 +187,7 @@ export default function AddTransactionModal({
               className="readonly-input"
             />
             <small className="auto-profit-hint">
-              Calculé automatiquement : chiffre d’affaires - dépenses
+              Pas besoin d'y toucher !
             </small>
           </div>
 
