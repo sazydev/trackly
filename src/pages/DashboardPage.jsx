@@ -22,6 +22,10 @@ import {
   X,
   Camera,
   User,
+  KeyRound,
+  ImageOff,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
