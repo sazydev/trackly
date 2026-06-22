@@ -20,6 +20,7 @@ import {
   CheckCircle,
   AlertCircle,
   X,
+  Camera,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
