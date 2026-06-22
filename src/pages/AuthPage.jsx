@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, MailCheck } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 export default function AuthPage({ onLogin }) {
@@ -10,10 +10,13 @@ export default function AuthPage({ onLogin }) {
   const [password, setPassword] = useState("");
 
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [message, setMessage] = useState(null);
+  const [showResend, setShowResend] = useState(false);
 
   function resetMessage() {
     setMessage(null);
+    setShowResend(false);
   }
 
   function switchMode() {
@@ -22,6 +25,43 @@ export default function AuthPage({ onLogin }) {
     setEmail("");
     setPassword("");
     resetMessage();
+  }
+
+  async function resendConfirmationEmail() {
+    if (!email) {
+      setMessage({
+        type: "error",
+        title: "Email manquant",
+        text: "Entre ton adresse e-mail pour recevoir un nouveau lien.",
+      });
+      return;
+    }
+
+    setResending(true);
+
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: window.location.origin + "/login",
+      },
+    });
+
+    if (error) {
+      setMessage({
+        type: "error",
+        title: "Envoi impossible",
+        text: error.message,
+      });
+    } else {
+      setMessage({
+        type: "success",
+        title: "Email renvoyé",
+        text: "Un nouveau lien de confirmation vient d’être envoyé.",
+      });
+    }
+
+    setResending(false);
   }
 
   async function handleAuth() {
@@ -34,6 +74,7 @@ export default function AuthPage({ onLogin }) {
           email,
           password,
           options: {
+            emailRedirectTo: window.location.origin + "/login",
             data: {
               full_name: fullName,
             },
@@ -51,16 +92,12 @@ export default function AuthPage({ onLogin }) {
 
         setMessage({
           type: "success",
-          title: "Compte créé avec succès",
-          text: "Tu peux maintenant te connecter à ton dashboard.",
+          title: "Compte créé",
+          text: "Vérifie ta boîte mail et confirme ton adresse avant de te connecter.",
         });
 
-        setTimeout(() => {
-          setIsRegister(false);
-          setPassword("");
-          setMessage(null);
-        }, 1800);
-
+        setShowResend(true);
+        setPassword("");
         return;
       }
 
@@ -70,25 +107,47 @@ export default function AuthPage({ onLogin }) {
       });
 
       if (error) {
+        const isEmailNotConfirmed =
+          error.message?.toLowerCase().includes("email not confirmed") ||
+          error.message?.toLowerCase().includes("not confirmed");
+
         setMessage({
           type: "error",
-          title: "Connexion impossible",
-          text: "Email ou mot de passe incorrect.",
+          title: isEmailNotConfirmed ? "Email non vérifié" : "Connexion impossible",
+          text: isEmailNotConfirmed
+            ? "Tu dois confirmer ton adresse e-mail avant de pouvoir accéder à Trackly."
+            : "Email ou mot de passe incorrect.",
         });
+
+        if (isEmailNotConfirmed) {
+          setShowResend(true);
+        }
+
         return;
       }
 
-      if (data.user) {
+      if (!data.user?.email_confirmed_at) {
+        await supabase.auth.signOut();
+
         setMessage({
-          type: "success",
-          title: "Connexion réussie",
-          text: "Chargement de ton espace Trackly...",
+          type: "error",
+          title: "Email non vérifié",
+          text: "Confirme ton adresse e-mail avant de te connecter.",
         });
 
-        setTimeout(() => {
-          onLogin();
-        }, 800);
+        setShowResend(true);
+        return;
       }
+
+      setMessage({
+        type: "success",
+        title: "Connexion réussie",
+        text: "Chargement de ton espace Trackly...",
+      });
+
+      setTimeout(() => {
+        onLogin();
+      }, 800);
     } catch (error) {
       setMessage({
         type: "error",
@@ -104,23 +163,15 @@ export default function AuthPage({ onLogin }) {
     <main className="auth-page">
       <section className="auth-card">
         <div className="brand">
-          <img
-            src="/logo/logo.png"
-            alt="Trackly Logo"
-            className="brand-logo"
-          />
+          <img src="/logo/logo.png" alt="Trackly Logo" className="brand-logo" />
         </div>
 
-        <h1>
-          {isRegister
-            ? "Crée ton compte"
-            : "Connecte-toi à ton dashboard"}
-        </h1>
+        <h1>{isRegister ? "Crée ton compte" : "Connecte-toi à ton dashboard"}</h1>
 
         <p>
           {isRegister
-            ? "Commence à suivre tes ventes, tes bénéfices et tes objectifs."
-            : "Suis tes ventes, tes bénéfices et l’évolution de ton business."}
+            ? "Crée ton compte, puis valide ton adresse e-mail pour accéder à Trackly."
+            : "Connecte-toi avec une adresse e-mail vérifiée."}
         </p>
 
         {message && (
@@ -138,6 +189,27 @@ export default function AuthPage({ onLogin }) {
               <span>{message.text}</span>
             </div>
           </div>
+        )}
+
+        {showResend && (
+          <button
+            type="button"
+            className="resend-email-btn"
+            onClick={resendConfirmationEmail}
+            disabled={resending}
+          >
+            {resending ? (
+              <>
+                <Loader2 size={18} className="spinner" />
+                Envoi...
+              </>
+            ) : (
+              <>
+                <MailCheck size={18} />
+                Renvoyer l’e-mail de confirmation
+              </>
+            )}
+          </button>
         )}
 
         <form
@@ -188,14 +260,9 @@ export default function AuthPage({ onLogin }) {
         </form>
 
         <p className="switch">
-          {isRegister
-            ? "Déjà un compte ?"
-            : "Pas encore de compte ?"}{" "}
-
+          {isRegister ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
           <span onClick={switchMode}>
-            {isRegister
-              ? "Se connecter"
-              : "Créer un compte"}
+            {isRegister ? "Se connecter" : "Créer un compte"}
           </span>
         </p>
       </section>

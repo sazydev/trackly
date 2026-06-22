@@ -978,7 +978,7 @@ export default function DashboardPage({ user, onLogout }) {
                       onChange={(e) =>
                         setProfileForm({ ...profileForm, full_name: e.target.value })
                       }
-                      placeholder="Ex : Eva Gehin"
+                      placeholder="Ex : Théo Dupont"
                     />
                   </div>
 
