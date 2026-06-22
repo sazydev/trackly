@@ -20,9 +20,6 @@ import {
   CheckCircle,
   AlertCircle,
   X,
-  Trash2,
-  AlertTriangle,
-  Loader2,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -111,6 +108,7 @@ export default function DashboardPage({ user, onLogout }) {
   const [transactions, setTransactions] = useState([]);
   const [goals, setGoals] = useState(null);
   const [subscription, setSubscription] = useState(null);
+  const [profile, setProfile] = useState(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -121,13 +119,20 @@ export default function DashboardPage({ user, onLogout }) {
   const [savingGoals, setSavingGoals] = useState(false);
   const [isEditingGoals, setIsEditingGoals] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [dateFilter, setDateFilter] = useState("30d");
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [toast, setToast] = useState(null);
-  const [transactionToDelete, setTransactionToDelete] = useState(null);
-  const [deletingTransaction, setDeletingTransaction] = useState(false);
+
+  const [profileForm, setProfileForm] = useState({
+    full_name: user.user_metadata?.full_name || "",
+    email: user.email || "",
+    new_password: "",
+  });
 
   const [goalForm, setGoalForm] = useState({
     revenue_goal: "",
@@ -211,10 +216,221 @@ export default function DashboardPage({ user, onLogout }) {
     setLoadingSubscription(false);
   }
 
+  async function fetchProfile() {
+    setLoadingProfile(true);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (error) {
+      console.error(error);
+      showToast("error", "Impossible de charger ton profil.");
+    }
+
+    const nextProfile = data || null;
+    setProfile(nextProfile);
+
+    setProfileForm({
+      full_name:
+        nextProfile?.full_name ||
+        user.user_metadata?.full_name ||
+        "",
+      email: user.email || "",
+      new_password: "",
+    });
+
+    setLoadingProfile(false);
+  }
+
+  function getDisplayName() {
+    return profile?.full_name || user.user_metadata?.full_name || "Utilisateur Trackly";
+  }
+
+  function getAvatarInitial() {
+    return (getDisplayName() || user.email || "U").charAt(0).toUpperCase();
+  }
+
+  function renderUserAvatar(className = "settings-avatar") {
+    if (profile?.avatar_url) {
+      return (
+        <img
+          src={profile.avatar_url}
+          alt="Photo de profil"
+          className={`${className} avatar-image`}
+        />
+      );
+    }
+
+    return <div className={className}>{getAvatarInitial()}</div>;
+  }
+
+  async function handleAvatarUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      showToast("error", "Le fichier doit être une image.");
+      return;
+    }
+
+    try {
+      setUploadingAvatar(true);
+
+      const extension = file.name.split(".").pop() || "jpg";
+      const filePath = `${user.id}/avatar-${Date.now()}.${extension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(filePath);
+
+      const avatarUrl = publicUrlData.publicUrl;
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            full_name: profileForm.full_name || getDisplayName(),
+            avatar_url: avatarUrl,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      showToast("success", "Photo de profil mise à jour.");
+    } catch (error) {
+      console.error(error);
+      showToast("error", error.message || "Impossible d’envoyer l’image.");
+    } finally {
+      setUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
+
+  async function removeAvatar() {
+    try {
+      setSavingProfile(true);
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            full_name: profileForm.full_name || getDisplayName(),
+            avatar_url: null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setProfile(data);
+      showToast("success", "Photo de profil supprimée.");
+    } catch (error) {
+      console.error(error);
+      showToast("error", error.message || "Impossible de supprimer la photo.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleSaveProfile(event) {
+    event.preventDefault();
+    setSavingProfile(true);
+
+    try {
+      const fullName = profileForm.full_name.trim();
+      const nextEmail = profileForm.email.trim();
+
+      if (!fullName) {
+        throw new Error("Le nom complet est obligatoire.");
+      }
+
+      const { data, error } = await supabase
+        .from("profiles")
+        .upsert(
+          {
+            id: user.id,
+            full_name: fullName,
+            avatar_url: profile?.avatar_url || null,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }
+        )
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const authUpdates = {
+        data: {
+          full_name: fullName,
+          avatar_url: profile?.avatar_url || null,
+        },
+      };
+
+      if (nextEmail && nextEmail !== user.email) {
+        authUpdates.email = nextEmail;
+      }
+
+      if (profileForm.new_password) {
+        if (profileForm.new_password.length < 6) {
+          throw new Error("Le mot de passe doit contenir au moins 6 caractères.");
+        }
+
+        authUpdates.password = profileForm.new_password;
+      }
+
+      const { error: authError } = await supabase.auth.updateUser(authUpdates);
+      if (authError) throw authError;
+
+      setProfile(data);
+      setProfileForm((current) => ({
+        ...current,
+        full_name: fullName,
+        email: nextEmail,
+        new_password: "",
+      }));
+
+      showToast(
+        "success",
+        nextEmail !== user.email
+          ? "Profil sauvegardé. Vérifie ton email pour confirmer le changement d’adresse."
+          : "Profil sauvegardé avec succès."
+      );
+    } catch (error) {
+      console.error(error);
+      showToast("error", error.message || "Impossible de sauvegarder le profil.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   useEffect(() => {
     fetchTransactions();
     fetchGoals();
     fetchSubscription();
+    fetchProfile();
   }, []);
 
   function formatDate(date) {
@@ -312,29 +528,21 @@ export default function DashboardPage({ user, onLogout }) {
     setSavingGoals(false);
   }
 
-  function askDeleteTransaction(transaction) {
-    setTransactionToDelete(transaction);
-  }
-
-  async function deleteTransaction() {
-    if (!transactionToDelete) return;
-
-    setDeletingTransaction(true);
+  async function deleteTransaction(transaction) {
+    const confirmDelete = window.confirm(`Supprimer "${transaction.title}" ?`);
+    if (!confirmDelete) return;
 
     const { error } = await supabase
       .from("transactions")
       .delete()
-      .eq("id", transactionToDelete.id)
+      .eq("id", transaction.id)
       .eq("user_id", user.id);
-
-    setDeletingTransaction(false);
 
     if (error) {
       showToast("error", error.message);
       return;
     }
 
-    setTransactionToDelete(null);
     await fetchTransactions();
     showToast("success", "Transaction supprimée avec succès.");
   }
@@ -463,6 +671,11 @@ export default function DashboardPage({ user, onLogout }) {
       eyebrow: "Workspace settings",
       title: "Paramètres Trackly",
       text: "Gère tes données, ton abonnement et ton espace business.",
+    },
+    profile: {
+      eyebrow: "User profile",
+      title: "Profil utilisateur",
+      text: "Modifie ton identité, ta photo de profil et tes informations de connexion.",
     },
   };
 
@@ -699,19 +912,229 @@ export default function DashboardPage({ user, onLogout }) {
     );
   }
 
+  function renderProfilePage() {
+    return (
+      <section className="profile-page">
+        <section className="panel profile-hero-card">
+          <div className="profile-avatar-wrap">
+            {renderUserAvatar("profile-avatar")}
+            <label className="profile-avatar-upload">
+              <Camera size={18} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+                disabled={uploadingAvatar}
+              />
+            </label>
+          </div>
+
+          <div className="profile-hero-copy">
+            <span className="eyebrow">Profil Trackly</span>
+            <h3>{getDisplayName()}</h3>
+            <p>{user.email}</p>
+
+            <div className="profile-status-row">
+              <span>
+                <ShieldCheck size={16} />
+                Compte sécurisé
+              </span>
+              <span>
+                <Calendar size={16} />
+                Inscrit le {formatDate(user.created_at)}
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="profile-grid">
+          <form className="panel profile-panel profile-form-panel" onSubmit={handleSaveProfile}>
+            <div className="panel-header">
+              <div>
+                <h3>Informations personnelles</h3>
+                <p>Modifie les informations visibles sur ton espace Trackly.</p>
+              </div>
+              <div className="subscription-icon">
+                <User size={22} />
+              </div>
+            </div>
+
+            {loadingProfile ? (
+              <div className="mini-empty">Chargement du profil...</div>
+            ) : (
+              <>
+                <div className="profile-form-grid">
+                  <div className="form-group">
+                    <label>Nom complet</label>
+                    <input
+                      type="text"
+                      value={profileForm.full_name}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, full_name: e.target.value })
+                      }
+                      placeholder="Ex : Eva Gehin"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={profileForm.email}
+                      onChange={(e) =>
+                        setProfileForm({ ...profileForm, email: e.target.value })
+                      }
+                      placeholder="email@exemple.com"
+                    />
+                  </div>
+
+                  <div className="form-group full">
+                    <label>Nouveau mot de passe</label>
+                    <div className="profile-password-field">
+                      <KeyRound size={17} />
+                      <input
+                        type="password"
+                        value={profileForm.new_password}
+                        onChange={(e) =>
+                          setProfileForm({
+                            ...profileForm,
+                            new_password: e.target.value,
+                          })
+                        }
+                        placeholder="Laisse vide si tu ne veux pas le modifier"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button type="submit" disabled={savingProfile || uploadingAvatar}>
+                  {savingProfile ? (
+                    <>
+                      <Loader2 size={18} className="spinner" />
+                      Sauvegarde...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} />
+                      Enregistrer le profil
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </form>
+
+          <div className="panel profile-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Photo de profil</h3>
+                <p>Ajoute ou remplace ton avatar utilisateur.</p>
+              </div>
+              <div className="subscription-icon">
+                <ImageOff size={22} />
+              </div>
+            </div>
+
+            <div className="profile-photo-card">
+              {renderUserAvatar("profile-photo-preview")}
+
+              <div>
+                <strong>{profile?.avatar_url ? "Photo active" : "Aucune photo"}</strong>
+                <p>
+                  Format conseillé : carré, JPG ou PNG. L’image est stockée dans
+                  Supabase Storage.
+                </p>
+              </div>
+            </div>
+
+            <div className="profile-actions">
+              <label className="add-btn profile-upload-btn">
+                <Upload size={18} />
+                {uploadingAvatar ? "Envoi..." : "Changer la photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarUpload}
+                  disabled={uploadingAvatar}
+                />
+              </label>
+
+              <button
+                type="button"
+                className="ghost-btn profile-remove-btn"
+                onClick={removeAvatar}
+                disabled={savingProfile || !profile?.avatar_url}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="profile-grid">
+          <div className="panel profile-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Sécurité du compte</h3>
+                <p>Résumé de l’état de ton compte utilisateur.</p>
+              </div>
+            </div>
+
+            <div className="settings-list">
+              <div>
+                <span>
+                  <Mail size={16} />
+                  Email actuel
+                </span>
+                <strong>{user.email}</strong>
+              </div>
+
+              <div>
+                <span>
+                  <ShieldCheck size={16} />
+                  Protection
+                </span>
+                <strong className="positive-text">Compte sécurisé</strong>
+              </div>
+
+              <div>
+                <span>
+                  <CreditCard size={16} />
+                  Abonnement
+                </span>
+                <strong className={getSubscriptionClass(subscription?.status)}>
+                  {getSubscriptionLabel(subscription?.status)}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="panel profile-panel danger-zone-panel">
+            <div className="panel-header">
+              <div>
+                <h3>Session</h3>
+                <p>Tu peux te déconnecter de Trackly à tout moment.</p>
+              </div>
+            </div>
+
+            <button className="logout-btn profile-logout-btn" onClick={onLogout}>
+              Déconnexion
+            </button>
+          </div>
+        </section>
+      </section>
+    );
+  }
+
   function renderSettingsPage() {
     return (
       <section className="settings-page">
         <section className="settings-hero panel">
-          <div className="settings-avatar">
-            {(user.user_metadata?.full_name || user.email || "U")
-              .charAt(0)
-              .toUpperCase()}
-          </div>
+          {renderUserAvatar("settings-avatar")}
 
           <div>
             <span className="eyebrow">Compte Trackly</span>
-            <h3>{user.user_metadata?.full_name || "Utilisateur Trackly"}</h3>
+            <h3>{getDisplayName()}</h3>
             <p>{user.email}</p>
           </div>
 
@@ -923,6 +1346,10 @@ export default function DashboardPage({ user, onLogout }) {
       return renderSettingsPage();
     }
 
+    if (activePage === "profile") {
+      return renderProfilePage();
+    }
+
     if (transactions.length === 0) {
       return (
         <div className="panel empty-panel">
@@ -968,7 +1395,7 @@ export default function DashboardPage({ user, onLogout }) {
             transactions={revenueTransactions}
             title="Transactions de revenus"
             onEdit={editTransaction}
-            onDelete={askDeleteTransaction}
+            onDelete={deleteTransaction}
           />
         </>
       );
@@ -997,7 +1424,7 @@ export default function DashboardPage({ user, onLogout }) {
             transactions={expenseTransactions}
             title="Dépenses enregistrées"
             onEdit={editTransaction}
-            onDelete={askDeleteTransaction}
+            onDelete={deleteTransaction}
           />
         </>
       );
@@ -1017,7 +1444,7 @@ export default function DashboardPage({ user, onLogout }) {
           <TransactionsTable
             transactions={filteredTransactions}
             onEdit={editTransaction}
-            onDelete={askDeleteTransaction}
+            onDelete={deleteTransaction}
           />
 
           <PerformancePanel stats={stats} />
@@ -1055,77 +1482,6 @@ export default function DashboardPage({ user, onLogout }) {
           </button>
         </div>
       )}
-
-{transactionToDelete && (
-  <div
-    className="delete-modal-overlay"
-    onClick={() => !deletingTransaction && setTransactionToDelete(null)}
-  >
-    <section
-      className="delete-modal-card"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <button
-        type="button"
-        className="delete-modal-close"
-        onClick={() => setTransactionToDelete(null)}
-        disabled={deletingTransaction}
-        aria-label="Fermer"
-      >
-        <X size={18} />
-      </button>
-
-      <div className="delete-modal-icon">
-        <AlertTriangle size={30} />
-      </div>
-
-      <span className="delete-modal-kicker">Suppression définitive</span>
-
-      <h2>Supprimer cette transaction ?</h2>
-
-      <p>
-        Tu es sur le point de supprimer{" "}
-        <strong>{transactionToDelete.title}</strong>. Cette action est
-        définitive.
-      </p>
-
-      <div className="delete-modal-summary">
-        <span>Montant</span>
-        <strong>{formatCurrency(Number(transactionToDelete.revenue || 0))}</strong>
-      </div>
-
-      <div className="delete-modal-actions">
-        <button
-          type="button"
-          className="delete-cancel-btn"
-          onClick={() => setTransactionToDelete(null)}
-          disabled={deletingTransaction}
-        >
-          Annuler
-        </button>
-
-        <button
-          type="button"
-          className="delete-confirm-btn"
-          onClick={deleteTransaction}
-          disabled={deletingTransaction}
-        >
-          {deletingTransaction ? (
-            <>
-              <Loader2 size={18} className="spinner" />
-              Suppression...
-            </>
-          ) : (
-            <>
-              <Trash2 size={18} />
-              Supprimer
-            </>
-          )}
-        </button>
-      </div>
-    </section>
-  </div>
-)}
 
       {modalOpen && (
         <AddTransactionModal

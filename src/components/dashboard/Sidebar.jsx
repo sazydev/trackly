@@ -4,6 +4,7 @@ import {
   Wallet,
   Target,
   Settings,
+  User,
   LogOut,
 } from "lucide-react";
 
@@ -13,6 +14,7 @@ const links = [
   { id: "expenses", label: "Dépenses", icon: Wallet },
   { id: "goals", label: "Objectifs", icon: Target },
   { id: "settings", label: "Paramètres", icon: Settings },
+  { id: "profile", label: "Profil", icon: User },
 ];
 
 export default function Sidebar({ activePage, setActivePage, onLogout }) {
