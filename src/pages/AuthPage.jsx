@@ -43,7 +43,7 @@ export default function AuthPage({ onLogin }) {
       type: "signup",
       email,
       options: {
-        emailRedirectTo: window.location.origin + "/login",
+        emailRedirectTo: "https://trackly2.netlify.app",
       },
     });
 
@@ -74,7 +74,7 @@ export default function AuthPage({ onLogin }) {
           email,
           password,
           options: {
-            emailRedirectTo: window.location.origin + "/login",
+            emailRedirectTo: "https://trackly2.netlify.app",
             data: {
               full_name: fullName,
             },
