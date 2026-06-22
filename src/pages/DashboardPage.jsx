@@ -21,6 +21,7 @@ import {
   AlertCircle,
   X,
   Camera,
+  User,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
